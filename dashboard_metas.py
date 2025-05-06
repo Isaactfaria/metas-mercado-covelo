@@ -5,12 +5,6 @@ from datetime import datetime
 import os
 import locale
 
-# Configurar locale para português
-try:
-    locale.setlocale(locale.LC_TIME, 'pt_BR.utf8')
-except:
-    locale.setlocale(locale.LC_TIME, 'pt_BR')  # Para Windows ou outros sistemas
-
 # Configuração da página
 st.set_page_config(
     page_title="Sistema de Metas - Mercado Covelo",
@@ -18,6 +12,13 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# Dicionário de meses em português (solução alternativa)
+MESES_PT = {
+    1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril",
+    5: "Maio", 6: "Junho", 7: "Julho", 8: "Agosto",
+    9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro"
+}
 
 # Estilos CSS personalizados
 st.markdown("""
@@ -59,6 +60,15 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# Função para formatar data em português (solução alternativa)
+def formatar_mes_ano(data):
+    try:
+        return data.strftime('%B %Y').title()  # Tenta o locale primeiro
+    except:
+        # Solução alternativa se o locale falhar
+        mes = MESES_PT[data.month]
+        return f"{mes} {data.year}"
+
 # Funções auxiliares
 def load_data():
     if not os.path.exists('metas.csv'):
@@ -96,11 +106,9 @@ with st.sidebar:
     with col1:
         ano = st.selectbox("Ano", range(2023, 2027))
     with col2:
-        # Lista de meses por nome em português
-        meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-                'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
-        mes_nome = st.selectbox("Mês", meses)
-        mes_numero = meses.index(mes_nome) + 1
+        # Lista de meses por nome em português (usando nosso dicionário)
+        mes_nome = st.selectbox("Mês", list(MESES_PT.values()))
+        mes_numero = list(MESES_PT.keys())[list(MESES_PT.values()).index(mes_nome)]
     
     data_meta = datetime(ano, mes_numero, 1)
     
@@ -152,14 +160,19 @@ with st.container():
     if not metas_df.empty:
         col1, col2 = st.columns(2)
         with col1:
-            # Mostrar meses no formato "Março 2025" em português
-            opcoes_meses = metas_df['Mes'].dt.strftime('%B %Y').str.title()
+            # Mostrar meses formatados em português
+            opcoes_meses = [formatar_mes_ano(dt) for dt in metas_df['Mes'].unique()]
             mes_selecionado = st.selectbox(
                 "Selecione o mês",
-                opcoes_meses.unique(),
+                opcoes_meses,
                 key='select_mes'
             )
-            data_resultado = pd.to_datetime(mes_selecionado, format='%B %Y').normalize()
+            # Converter de volta para datetime
+            try:
+                data_resultado = pd.to_datetime(mes_selecionado, format='%B %Y').normalize()
+            except:
+                # Se falhar, pega o primeiro disponível
+                data_resultado = metas_df['Mes'].iloc[0]
         
         with col2:
             # Encontrar o valor realizado atual para pré-preencher
@@ -193,7 +206,12 @@ if not resultados_df.empty and not metas_df.empty:
         
         # Obter o mês selecionado
         mes_selecionado = st.session_state.select_mes if 'select_mes' in st.session_state else None
-        data_selecionada = pd.to_datetime(mes_selecionado, format='%B %Y').normalize() if mes_selecionado else None
+        
+        # Converter para data (usando nossa função alternativa)
+        try:
+            data_selecionada = pd.to_datetime(mes_selecionado, format='%B %Y').normalize() if mes_selecionado else None
+        except:
+            data_selecionada = dados['Mes'].iloc[0]
         
         # Filtrar para o mês selecionado ou pegar o mais recente
         if data_selecionada is not None and data_selecionada in dados['Mes'].values:
@@ -202,11 +220,11 @@ if not resultados_df.empty and not metas_df.empty:
                 ultimo = dados_filtrados.iloc[0]
             else:
                 ultimo = dados.iloc[0]
-                st.warning(f"Dados não encontrados para {mes_selecionado}, mostrando {ultimo['Mes'].strftime('%B %Y').title()}")
+                st.warning(f"Dados não encontrados para {mes_selecionado}, mostrando {formatar_mes_ano(ultimo['Mes'])}")
         else:
             ultimo = dados.iloc[0]
         
-        mes_formatado = ultimo['Mes'].strftime('%B %Y').title()
+        mes_formatado = formatar_mes_ano(ultimo['Mes'])
         
         # Cálculo dos status e pagamentos
         # Vendas
