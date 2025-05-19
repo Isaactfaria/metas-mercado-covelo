@@ -5,6 +5,23 @@ from datetime import datetime
 import os
 import locale
 
+# Configurar locale para português
+locale.setlocale(locale.LC_TIME, 'pt_BR.UTF-8')
+
+# Se o locale não estiver disponível, usar fallback
+if locale.getlocale(locale.LC_TIME) != ('pt_BR', 'UTF-8'):
+    MESES_PT = {
+        1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril",
+        5: "Maio", 6: "Junho", 7: "Julho", 8: "Agosto",
+        9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro"
+    }
+    def formatar_mes_ano(data):
+        mes = MESES_PT[data.month]
+        return f"{mes} {data.year}"
+else:
+    def formatar_mes_ano(data):
+        return data.strftime('%B %Y').title()
+
 # Configuração da página
 st.set_page_config(
     page_title="Sistema de Metas - Mercado Covelo",
@@ -72,33 +89,96 @@ st.markdown("""
     
     .card {
         background: white;
-        border-radius: 12px;
-        padding: 25px;
-        margin-bottom: 25px;
+        border-radius: 15px;
+        padding: 30px;
+        margin-bottom: 30px;
         box-shadow: var(--card-shadow);
-        border-top: 4px solid var(--primary-color);
+        border-top: 6px solid var(--primary-color);
         transition: transform 0.3s ease, box-shadow 0.3s ease;
-    }
-    
-    .card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        min-height: 200px;
+        width: 100%;
     }
     
     .card-title {
-        font-size: 18px;
+        font-size: 20px;
         font-weight: 600;
         color: var(--secondary-color);
-        margin-bottom: 15px;
+        margin-bottom: 20px;
         display: flex;
         align-items: center;
+        justify-content: center;
     }
     
     .card-value {
-        font-size: 28px;
+        font-size: 32px;
         font-weight: 700;
         color: var(--primary-color);
+        margin: 15px 0;
+        min-height: 50px;
+    }
+    
+    .status-badge {
+        padding: 8px 16px;
+        border-radius: 25px;
+        font-size: 16px;
+        font-weight: 600;
+        display: inline-block;
         margin: 10px 0;
+        min-width: 120px;
+        text-align: center;
+    }
+    
+    .card-metas {
+        font-size: 12px;
+        color: #666;
+        margin: 5px 0;
+        padding: 5px 10px;
+        background: var(--light-bg);
+        border-radius: 5px;
+        width: 100%;
+        text-align: center;
+        min-height: 30px;
+    }
+    
+    .metric-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 30px;
+        margin-top: 20px;
+        width: 100%;
+    }
+    
+    .metric-item {
+        background: var(--light-bg);
+        border-radius: 15px;
+        padding: 20px;
+        text-align: center;
+        min-height: 150px;
+        transition: transform 0.3s ease;
+    }
+    
+    .metric-item:hover {
+        transform: translateY(-5px);
+        box-shadow: var(--card-shadow);
+    }
+    
+    .metric-title {
+        font-size: 16px;
+        color: var(--secondary-color);
+        margin-bottom: 12px;
+        font-weight: 600;
+    }
+    
+    .metric-value {
+        font-size: 24px;
+        font-weight: 700;
+        margin-bottom: 10px;
+        color: var(--primary-color);
+        min-height: 40px;
     }
     
     .card-subvalue {
@@ -207,16 +287,22 @@ st.markdown("""
     }
     
     .setor-total {
-        font-size: 22px;
-        font-weight: 700;
+        font-size: 18px;
+        font-weight: 600;
+        color: #666;
+        padding: 5px 10px;
+        border-radius: 4px;
+        margin-left: 10px;
     }
     
     .setor-total.adm {
         color: var(--adm-color);
+        background-color: rgba(25, 118, 210, 0.1);
     }
     
     .setor-total.comercial {
         color: var(--comercial-color);
+        background-color: rgba(230, 81, 0, 0.1);
     }
     
     .divider {
@@ -279,18 +365,20 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Função para formatar data em português (solução alternativa)
+# Função para formatar data em português
 def formatar_mes_ano(data):
-    try:
-        return data.strftime('%B %Y').title()  # Tenta o locale primeiro
-    except:
-        # Solução alternativa se o locale falhar
-        mes = MESES_PT[data.month]
-        return f"{mes} {data.year}"
+    # Garante que a data é um objeto datetime
+    if not isinstance(data, pd.Timestamp):
+        data = pd.to_datetime(data)
+    
+    # Usa locale para formatar a data
+    return data.strftime('%B %Y').title()
 
 # Função para formatar valores monetários
 def formatar_moeda(valor):
-    return f"{valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    if isinstance(valor, (int, float)):
+        return f"{valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    return valor
 
 # Funções auxiliares (mantidas as mesmas)
 def load_data():
@@ -423,11 +511,11 @@ with st.expander("📤 Inserir Resultados", expanded=True):
         
         with col2:
             realizado_atual = resultados_df[resultados_df['Mes'] == data_resultado]['Realizado_Comercial']
-            valor_inicial = realizado_atual.values[0] if not realizado_atual.empty else 0.0
+            valor_inicial = float(realizado_atual.values[0]) if not realizado_atual.empty else 0.0
             realizado_com = st.number_input("Vendas Realizadas (R$)", min_value=0.0, value=valor_inicial, step=10000.0)
-        
+    
         margem_atual = resultados_df[resultados_df['Mes'] == data_resultado]['Realizado_Margem']
-        margem_inicial = margem_atual.values[0] if not margem_atual.empty else 0.0
+        margem_inicial = float(margem_atual.values[0]) if not margem_atual.empty else 0.0
         realizado_margem = st.number_input("Margem Realizada (%)", min_value=0.0, max_value=100.0, value=margem_inicial, step=0.01)
         
         if st.button("💾 Salvar Resultados", use_container_width=True, key="save_resultados"):
@@ -539,11 +627,13 @@ def processar_dados():
             
             with col1:
                 st.markdown(f"""
-                <div class='card'>
-                    <div class='card-title'>📊 Performance Comercial</div>
-                    <div class='card-value'>R$ {formatar_moeda(ultimo['Realizado_Comercial'])}</div>
-                    <div class='card-subvalue'>Meta: R$ {formatar_moeda(ultimo['Meta_Comercial_Ideal'])}</div>
-                    <div class='status-badge {status_vendas_class}'>{status_vendas}</div>
+                <div class="card">
+                    <div class="card-title">📊 Performance Comercial</div>
+                    <div class="card-value">R$ {formatar_moeda(float(ultimo['Realizado_Comercial']))}</div>
+                    <div class="status-badge {status_vendas_class}">{status_vendas}</div>
+                    <div class="card-metas">Mínimo: R$ {formatar_moeda(float(ultimo['Meta_Comercial_Min']))}</div>
+                    <div class="card-metas">Ideal: R$ {formatar_moeda(float(ultimo['Meta_Comercial_Ideal']))}</div>
+                    <div class="card-metas">Excelente: R$ {formatar_moeda(float(ultimo['Meta_Comercial_Excelente']))}</div>
                 </div>
                 """, unsafe_allow_html=True)
             
@@ -551,9 +641,11 @@ def processar_dados():
                 st.markdown(f"""
                 <div class='card'>
                     <div class='card-title'>📉 Performance de Margem</div>
-                    <div class='card-value'>{formatar_moeda(ultimo['Realizado_Margem'])}%</div>
-                    <div class='card-subvalue'>Meta: {formatar_moeda(ultimo['Meta_Margem_Ideal'])}%</div>
+                    <div class='card-value'>{formatar_moeda(float(ultimo['Realizado_Margem']))}%</div>
                     <div class='status-badge {status_margem_class}'>{status_margem}</div>
+                    <div class='card-metas'>Mínimo: {formatar_moeda(float(ultimo['Meta_Margem_Min']))}%</div>
+                    <div class='card-metas'>Ideal: {formatar_moeda(float(ultimo['Meta_Margem_Ideal']))}%</div>
+                    <div class='card-metas'>Excelente: {formatar_moeda(float(ultimo['Meta_Margem_Excelente']))}%</div>
                 </div>
                 """, unsafe_allow_html=True)
             
@@ -635,26 +727,7 @@ def processar_dados():
             )
             st.plotly_chart(fig_pagamentos, use_container_width=True)
             
-            # Tabela resumo
-            st.markdown("<div class='divider'></div>", unsafe_allow_html=True)
-            st.markdown("### 📋 Resumo Detalhado")
-            
-            resumo_data = {
-                "Indicador": ["Vendas Realizadas", "Meta Comercial", "Margem Realizada", "Meta de Margem"],
-                "Valor": [
-                    f"R$ {formatar_moeda(ultimo['Realizado_Comercial'])}",
-                    f"R$ {formatar_moeda(ultimo['Meta_Comercial_Ideal'])}",
-                    f"{formatar_moeda(ultimo['Realizado_Margem'])}%",
-                    f"{formatar_moeda(ultimo['Meta_Margem_Ideal'])}%"
-                ],
-                "Status": [status_vendas, "-", status_margem, "-"]
-            }
-            
-            st.dataframe(
-                pd.DataFrame(resumo_data),
-                use_container_width=True,
-                hide_index=True
-            )
+
         else:
             st.warning("Nenhum dado encontrado para processar.")
     except Exception as e:
