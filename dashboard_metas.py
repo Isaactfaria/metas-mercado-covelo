@@ -5,52 +5,30 @@ from datetime import datetime
 import os
 import locale
 
-# Configuração da página DEVE SER A PRIMEIRA COISA NO SCRIPT
+# Configurar locale para português
+locale.setlocale(locale.LC_TIME, 'pt_BR.UTF-8')
+
+# Se o locale não estiver disponível, usar fallback
+if locale.getlocale(locale.LC_TIME) != ('pt_BR', 'UTF-8'):
+    MESES_PT = {
+        1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril",
+        5: "Maio", 6: "Junho", 7: "Julho", 8: "Agosto",
+        9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro"
+    }
+    def formatar_mes_ano(data):
+        mes = MESES_PT[data.month]
+        return f"{mes} {data.year}"
+else:
+    def formatar_mes_ano(data):
+        return data.strftime('%B %Y').title()
+
+# Configuração da página
 st.set_page_config(
     page_title="Sistema de Metas - Mercado Covelo",
     page_icon="📈",
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
-# Configuração robusta do locale para português
-try:
-    locale.setlocale(locale.LC_TIME, 'pt_BR.UTF-8')
-except locale.Error:
-    try:
-        locale.setlocale(locale.LC_TIME, 'pt_BR.utf8')
-    except locale.Error:
-        try:
-            locale.setlocale(locale.LC_TIME, 'Portuguese_Brazil')
-        except locale.Error:
-            locale.setlocale(locale.LC_TIME, 'C')  # Fallback para locale padrão do sistema
-            st.warning("Locale pt_BR não encontrado, usando padrão do sistema")
-
-# Dicionário de meses em português (solução alternativa)
-MESES_PT = {
-    1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril",
-    5: "Maio", 6: "Junho", 7: "Julho", 8: "Agosto",
-    9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro"
-}
-
-# Função para formatar data em português com fallback
-def formatar_mes_ano(data):
-    try:
-        # Garante que a data é um objeto datetime
-        if not isinstance(data, pd.Timestamp):
-            data = pd.to_datetime(data)
-        
-        # Tenta usar locale para formatar a data
-        formatted = data.strftime('%B %Y').title()
-        
-        # Verifica se a formatação retornou em inglês (fallback)
-        if formatted.split()[0] not in MESES_PT.values():
-            return f"{MESES_PT[data.month]} {data.year}"
-        return formatted
-    except:
-        return f"{MESES_PT[data.month]} {data.year}"
-
-# Configuração da página (já definida no início do script)
 
 # Dicionário de meses em português (solução alternativa)
 MESES_PT = {
