@@ -5,6 +5,14 @@ from datetime import datetime
 import os
 import locale
 
+# Configuração da página DEVE SER A PRIMEIRA COISA NO SCRIPT
+st.set_page_config(
+    page_title="Sistema de Metas - Mercado Covelo",
+    page_icon="📈",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
 # Configuração robusta do locale para português
 try:
     locale.setlocale(locale.LC_TIME, 'pt_BR.UTF-8')
@@ -42,13 +50,7 @@ def formatar_mes_ano(data):
     except:
         return f"{MESES_PT[data.month]} {data.year}"
 
-# Configuração da página
-st.set_page_config(
-    page_title="Sistema de Metas - Mercado Covelo",
-    page_icon="📈",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+# Configuração da página (já definida no início do script)
 
 # Dicionário de meses em português (solução alternativa)
 MESES_PT = {
