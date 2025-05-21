@@ -15,6 +15,7 @@ st.set_page_config(
 
 # Configuração robusta do locale para português
 try:
+    # Tenta configurar o locale
     locale.setlocale(locale.LC_TIME, 'pt_BR.UTF-8')
 except locale.Error:
     try:
@@ -23,8 +24,15 @@ except locale.Error:
         try:
             locale.setlocale(locale.LC_TIME, 'Portuguese_Brazil')
         except locale.Error:
-            locale.setlocale(locale.LC_TIME, 'C')  # Fallback para locale padrão do sistema
-            st.warning("Locale pt_BR não encontrado, usando padrão do sistema")
+            try:
+                locale.setlocale(locale.LC_TIME, 'Portuguese')
+            except locale.Error:
+                try:
+                    locale.setlocale(locale.LC_TIME, '')  # Usa o locale padrão do sistema
+                except locale.Error:
+                    locale.setlocale(locale.LC_TIME, 'C')  # Fallback para locale padrão do sistema
+                    st.warning("Locale pt_BR não encontrado, usando padrão do sistema")
+                    st.info("Continuando com a configuração alternativa de meses em português")
 
 # Dicionário de meses em português (solução alternativa)
 MESES_PT = {
@@ -757,3 +765,10 @@ def processar_dados():
 
 # Chamar a função principal
 processar_dados()
+
+# Adicionar versão no rodapé
+st.markdown("""
+<div style='text-align: center; margin-top: 20px; color: #666; font-size: 12px;'>
+Versão 1.2.2.2
+</div>
+""", unsafe_allow_html=True)
