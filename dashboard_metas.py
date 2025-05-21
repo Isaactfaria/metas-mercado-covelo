@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.express as px
 from datetime import datetime
 import os
+import locale
 
 # Configuração da página DEVE SER A PRIMEIRA COISA NO SCRIPT
 st.set_page_config(
@@ -12,6 +13,19 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Configuração robusta do locale para português
+try:
+    locale.setlocale(locale.LC_TIME, 'pt_BR.UTF-8')
+except locale.Error:
+    try:
+        locale.setlocale(locale.LC_TIME, 'pt_BR.utf8')
+    except locale.Error:
+        try:
+            locale.setlocale(locale.LC_TIME, 'Portuguese_Brazil')
+        except locale.Error:
+            locale.setlocale(locale.LC_TIME, 'C')  # Fallback para locale padrão do sistema
+            st.warning("Locale pt_BR não encontrado, usando padrão do sistema")
+
 # Dicionário de meses em português (solução alternativa)
 MESES_PT = {
     1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril",
@@ -19,26 +33,31 @@ MESES_PT = {
     9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro"
 }
 
-# Função para formatar data em português
+# Função para formatar data em português com fallback
 def formatar_mes_ano(data):
     try:
         # Garante que a data é um objeto datetime
         if not isinstance(data, pd.Timestamp):
             data = pd.to_datetime(data)
         
-        return f"{MESES_PT[data.month]} {data.year}"
-    except Exception as e:
-        # Fallback caso algo dê errado
-        try:
+        # Tenta usar locale para formatar a data
+        formatted = data.strftime('%B %Y').title()
+        
+        # Verifica se a formatação retornou em inglês (fallback)
+        if formatted.split()[0] not in MESES_PT.values():
             return f"{MESES_PT[data.month]} {data.year}"
-        except:
-            return str(data)
+        return formatted
+    except:
+        return f"{MESES_PT[data.month]} {data.year}"
 
-# Função para formatar valores monetários
-def formatar_moeda(valor):
-    if isinstance(valor, (int, float)):
-        return f"{valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-    return valor
+# Configuração da página (já definida no início do script)
+
+# Dicionário de meses em português (solução alternativa)
+MESES_PT = {
+    1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril",
+    5: "Maio", 6: "Junho", 7: "Julho", 8: "Agosto",
+    9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro"
+}
 
 # Estilos CSS personalizados - Versão Aprimorada
 st.markdown("""
@@ -368,7 +387,22 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Funções auxiliares
+# Função para formatar data em português
+def formatar_mes_ano(data):
+    # Garante que a data é um objeto datetime
+    if not isinstance(data, pd.Timestamp):
+        data = pd.to_datetime(data)
+    
+    # Usa locale para formatar a data
+    return data.strftime('%B %Y').title()
+
+# Função para formatar valores monetários
+def formatar_moeda(valor):
+    if isinstance(valor, (int, float)):
+        return f"{valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    return valor
+
+# Funções auxiliares (mantidas as mesmas)
 def load_data():
     if not os.path.exists('metas.csv'):
         cols = ['Mes', 'Meta_Comercial_Min', 'Meta_Comercial_Ideal', 'Meta_Comercial_Excelente',
@@ -395,3 +429,331 @@ def load_data():
         
         # Remover colunas antigas
         metas = metas.drop(columns=['Valor_Pago_Min', 'Valor_Pago_Ideal', 'Valor_Pago_Excelente'], errors='ignore')
+        
+        # Salvar o arquivo atualizado
+        metas.to_csv('metas.csv', index=False)
+    
+    resultados = pd.read_csv('resultados.csv', parse_dates=['Mes'])
+    
+    # Garantir que as datas estão no mesmo formato
+    metas['Mes'] = pd.to_datetime(metas['Mes']).dt.normalize()
+    resultados['Mes'] = pd.to_datetime(resultados['Mes']).dt.normalize()
+    
+    return metas, resultados
+
+def save_data(metas, resultados):
+    metas.to_csv('metas.csv', index=False)
+    resultados.to_csv('resultados.csv', index=False)
+
+# Carregar dados
+metas_df, resultados_df = load_data()
+
+# Sidebar - Configuração (melhorada visualmente)
+with st.sidebar:
+    st.markdown("<div class='sidebar-title'>⚙️ Configuração de Metas</div>", unsafe_allow_html=True)
+    
+    # Seletor de período
+    st.markdown("**📅 Período**")
+    col1, col2 = st.columns(2)
+    with col1:
+        ano = st.selectbox("Ano", range(2023, 2027))
+    with col2:
+        mes_nome = st.selectbox("Mês", list(MESES_PT.values()))
+        mes_numero = list(MESES_PT.keys())[list(MESES_PT.values()).index(mes_nome)]
+    
+    data_meta = datetime(ano, mes_numero, 1)
+    
+    # Abas para organização
+    tab1, tab2, tab3 = st.tabs(["💰 Vendas", "📈 Margem", "💲 Pagamentos"])
+    
+    with tab1:
+        st.markdown("**Metas Comerciais**")
+        meta_min = st.number_input("Mínima (R$)", min_value=0.0, value=4000000.0, step=10000.0, key="meta_min")
+        meta_ideal = st.number_input("Ideal (R$)", min_value=0.0, value=4250000.0, step=10000.0, key="meta_ideal")
+        meta_excelente = st.number_input("Excelente (R$)", min_value=0.0, value=4500000.0, step=10000.0, key="meta_excelente")
+    
+    with tab2:
+        st.markdown("**Metas de Margem**")
+        margem_min = st.number_input("Mínima (%)", min_value=0.0, max_value=100.0, value=24.0, step=0.1, key="margem_min")
+        margem_ideal = st.number_input("Ideal (%)", min_value=0.0, max_value=100.0, value=25.0, step=0.1, key="margem_ideal")
+        margem_excelente = st.number_input("Excelente (%)", min_value=0.0, max_value=100.0, value=26.0, step=0.1, key="margem_excelente")
+    
+    with tab3:
+        st.markdown("**Valores a Pagar - ADM/Operacional**")
+        valor_min_adm = st.number_input("Mínimo - ADM (R$)", min_value=0.0, value=50.0, key="valor_min_adm")
+        valor_ideal_adm = st.number_input("Ideal - ADM (R$)", min_value=0.0, value=150.0, key="valor_ideal_adm")
+        valor_excelente_adm = st.number_input("Excelente - ADM (R$)", min_value=0.0, value=250.0, key="valor_excelente_adm")
+        
+        st.markdown("**Valores a Pagar - Comercial/Gerência**")
+        valor_min_comercial = st.number_input("Mínimo - Comercial (R$)", min_value=0.0, value=50.0, key="valor_min_comercial")
+        valor_ideal_comercial = st.number_input("Ideal - Comercial (R$)", min_value=0.0, value=150.0, key="valor_ideal_comercial")
+        valor_excelente_comercial = st.number_input("Excelente - Comercial (R$)", min_value=0.0, value=250.0, key="valor_excelente_comercial")
+    
+    if st.button("💾 Salvar Metas", use_container_width=True, key="save_metas"):
+        nova_meta = {
+            'Mes': data_meta,
+            'Meta_Comercial_Min': meta_min,
+            'Meta_Comercial_Ideal': meta_ideal,
+            'Meta_Comercial_Excelente': meta_excelente,
+            'Meta_Margem_Min': margem_min,
+            'Meta_Margem_Ideal': margem_ideal,
+            'Meta_Margem_Excelente': margem_excelente,
+            'Valor_Pago_Min_ADM': valor_min_adm,
+            'Valor_Pago_Ideal_ADM': valor_ideal_adm,
+            'Valor_Pago_Excelente_ADM': valor_excelente_adm,
+            'Valor_Pago_Min_Comercial': valor_min_comercial,
+            'Valor_Pago_Ideal_Comercial': valor_ideal_comercial,
+            'Valor_Pago_Excelente_Comercial': valor_excelente_comercial
+        }
+        
+        metas_df = metas_df[metas_df['Mes'] != pd.to_datetime(data_meta).normalize()]
+        metas_df = pd.concat([metas_df, pd.DataFrame([nova_meta])], ignore_index=True)
+        save_data(metas_df, resultados_df)
+        st.success("Metas salvas com sucesso!")
+        st.rerun()
+
+# Página principal - Layout aprimorado
+st.markdown("<div class='header'>📊 Painel de Performance</div>", unsafe_allow_html=True)
+
+# Seção de resultados - Mais organizada
+with st.expander("📤 Inserir Resultados", expanded=True):
+    if not metas_df.empty:
+        col1, col2 = st.columns(2)
+        with col1:
+            opcoes_meses = [formatar_mes_ano(dt) for dt in metas_df['Mes'].unique()]
+            mes_selecionado = st.selectbox(
+                "Selecione o mês",
+                opcoes_meses,
+                key='select_mes'
+            )
+            try:
+                data_resultado = pd.to_datetime(mes_selecionado, format='%B %Y').normalize()
+            except:
+                data_resultado = metas_df['Mes'].iloc[0]
+        
+        with col2:
+            realizado_atual = resultados_df[resultados_df['Mes'] == data_resultado]['Realizado_Comercial']
+            valor_inicial = float(realizado_atual.values[0]) if not realizado_atual.empty else 0.0
+            realizado_com = st.number_input("Vendas Realizadas (R$)", min_value=0.0, value=valor_inicial, step=10000.0)
+    
+        margem_atual = resultados_df[resultados_df['Mes'] == data_resultado]['Realizado_Margem']
+        margem_inicial = float(margem_atual.values[0]) if not margem_atual.empty else 0.0
+        realizado_margem = st.number_input("Margem Realizada (%)", min_value=0.0, max_value=100.0, value=margem_inicial, step=0.01)
+        
+        if st.button("💾 Salvar Resultados", use_container_width=True, key="save_resultados"):
+            novo_resultado = {
+                'Mes': data_resultado,
+                'Realizado_Comercial': realizado_com,
+                'Realizado_Margem': realizado_margem
+            }
+            
+            resultados_df = resultados_df[resultados_df['Mes'] != data_resultado]
+            resultados_df = pd.concat([resultados_df, pd.DataFrame([novo_resultado])], ignore_index=True)
+            save_data(metas_df, resultados_df)
+            st.success("Resultados salvos com sucesso!")
+            st.rerun()
+
+# Dashboard de Performance - Versão Aprimorada
+def processar_dados():
+    try:
+        if not resultados_df.empty and not metas_df.empty:
+            # Fazer o merge dos dados
+            dados = pd.merge(metas_df, resultados_df, on='Mes', how='left').sort_values('Mes', ascending=False)
+            
+            # Obter o mês selecionado
+            mes_selecionado = st.session_state.select_mes if 'select_mes' in st.session_state else None
+            
+            try:
+                data_selecionada = pd.to_datetime(mes_selecionado, format='%B %Y').normalize() if mes_selecionado else None
+            except:
+                data_selecionada = dados['Mes'].iloc[0]
+            
+            if data_selecionada is not None and data_selecionada in dados['Mes'].values:
+                dados_filtrados = dados[dados['Mes'] == data_selecionada]
+                if not dados_filtrados.empty:
+                    ultimo = dados_filtrados.iloc[0]
+                else:
+                    ultimo = dados.iloc[0]
+                    st.warning(f"Dados não encontrados para {mes_selecionado}, mostrando {formatar_mes_ano(ultimo['Mes'])}")
+            else:
+                ultimo = dados.iloc[0]
+            
+            mes_formatado = formatar_mes_ano(ultimo['Mes'])
+            
+            # Cálculo dos status e pagamentos (mantido igual)
+            if ultimo['Realizado_Comercial'] >= ultimo['Meta_Comercial_Excelente']:
+                status_vendas = "Excelente"
+                status_vendas_class = "badge-success"
+                pag_vendas_adm = ultimo['Valor_Pago_Excelente_ADM']
+                pag_vendas_comercial = ultimo['Valor_Pago_Excelente_Comercial']
+            elif ultimo['Realizado_Comercial'] >= ultimo['Meta_Comercial_Ideal']:
+                status_vendas = "Ideal"
+                status_vendas_class = "badge-success"
+                pag_vendas_adm = ultimo['Valor_Pago_Ideal_ADM']
+                pag_vendas_comercial = ultimo['Valor_Pago_Ideal_Comercial']
+            elif ultimo['Realizado_Comercial'] >= ultimo['Meta_Comercial_Min']:
+                status_vendas = "Mínimo"
+                status_vendas_class = "badge-warning"
+                pag_vendas_adm = ultimo['Valor_Pago_Min_ADM']
+                pag_vendas_comercial = ultimo['Valor_Pago_Min_Comercial']
+            else:
+                status_vendas = "Não atingido"
+                status_vendas_class = "badge-danger"
+                pag_vendas_adm = 0
+                pag_vendas_comercial = 0
+            
+            if ultimo['Realizado_Margem'] >= ultimo['Meta_Margem_Excelente']:
+                status_margem = "Excelente"
+                status_margem_class = "badge-success"
+                pag_margem_adm = ultimo['Valor_Pago_Excelente_ADM']
+                pag_margem_comercial = ultimo['Valor_Pago_Excelente_Comercial']
+            elif ultimo['Realizado_Margem'] >= ultimo['Meta_Margem_Ideal']:
+                status_margem = "Ideal"
+                status_margem_class = "badge-success"
+                pag_margem_adm = ultimo['Valor_Pago_Ideal_ADM']
+                pag_margem_comercial = ultimo['Valor_Pago_Ideal_Comercial']
+            elif ultimo['Realizado_Margem'] >= ultimo['Meta_Margem_Min']:
+                status_margem = "Mínimo"
+                status_margem_class = "badge-warning"
+                pag_margem_adm = ultimo['Valor_Pago_Min_ADM']
+                pag_margem_comercial = ultimo['Valor_Pago_Min_Comercial']
+            else:
+                status_margem = "Não atingido"
+                status_margem_class = "badge-danger"
+                pag_margem_adm = 0
+                pag_margem_comercial = 0
+            
+            total_adm = pag_vendas_adm + pag_margem_adm
+            total_comercial = pag_vendas_comercial + pag_margem_comercial
+            total_pagamento = total_adm + total_comercial
+            
+            # Header do dashboard
+            st.markdown(f"""
+            <div class='dashboard-header'>
+                <div class='dashboard-title'>Resumo de Performance</div>
+                <div class='dashboard-date' data-tooltip='Período de análise'>{mes_formatado}</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Seção de Pagamento - Destaque Total
+            st.markdown(f"""
+            <div class='total-card'>
+                <div class='total-title'>VALOR TOTAL A PAGAR</div>
+                <div class='total-value'>R$ {formatar_moeda(total_pagamento)}</div>
+                <div class='total-subtitle'>Distribuição entre os setores</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Cards de performance
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown(f"""
+                <div class="card">
+                    <div class="card-title">📊 Performance Comercial</div>
+                    <div class="card-value">R$ {formatar_moeda(float(ultimo['Realizado_Comercial']))}</div>
+                    <div class="status-badge {status_vendas_class}">{status_vendas}</div>
+                    <div class="card-metas">Mínimo: R$ {formatar_moeda(float(ultimo['Meta_Comercial_Min']))}</div>
+                    <div class="card-metas">Ideal: R$ {formatar_moeda(float(ultimo['Meta_Comercial_Ideal']))}</div>
+                    <div class="card-metas">Excelente: R$ {formatar_moeda(float(ultimo['Meta_Comercial_Excelente']))}</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col2:
+                st.markdown(f"""
+                <div class='card'>
+                    <div class='card-title'>📉 Performance de Margem</div>
+                    <div class='card-value'>{formatar_moeda(float(ultimo['Realizado_Margem']))}%</div>
+                    <div class='status-badge {status_margem_class}'>{status_margem}</div>
+                    <div class='card-metas'>Mínimo: {formatar_moeda(float(ultimo['Meta_Margem_Min']))}%</div>
+                    <div class='card-metas'>Ideal: {formatar_moeda(float(ultimo['Meta_Margem_Ideal']))}%</div>
+                    <div class='card-metas'>Excelente: {formatar_moeda(float(ultimo['Meta_Margem_Excelente']))}%</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            # Divisão visual
+            st.markdown("<div class='divider'></div>", unsafe_allow_html=True)
+            
+            # Seção por setor
+            st.markdown("### 💼 Distribuição por Setor")
+            
+            # Card ADM
+            st.markdown(f"""
+            <div class='card'>
+                <div class='setor-header'>
+                    <div class='setor-title adm'>👥 ADM/OPERACIONAL</div>
+                    <div class='setor-total adm'>Total: R$ {formatar_moeda(total_adm)}</div>
+                </div>
+                <div class='metric-grid'>
+                    <div class='metric-item'>
+                        <div class='metric-title'>Pagamento por Vendas</div>
+                        <div class='metric-value'>R$ {formatar_moeda(pag_vendas_adm)}</div>
+                        <div class='status-badge {status_vendas_class}'>{status_vendas}</div>
+                    </div>
+                    <div class='metric-item'>
+                        <div class='metric-title'>Pagamento por Margem</div>
+                        <div class='metric-value'>R$ {formatar_moeda(pag_margem_adm)}</div>
+                        <div class='status-badge {status_margem_class}'>{status_margem}</div>
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Card Comercial
+            st.markdown(f"""
+            <div class='card'>
+                <div class='setor-header'>
+                    <div class='setor-title comercial'>👔 COMERCIAL/GERÊNCIA</div>
+                    <div class='setor-total comercial'>Total: R$ {formatar_moeda(total_comercial)}</div>
+                </div>
+                <div class='metric-grid'>
+                    <div class='metric-item'>
+                        <div class='metric-title'>Pagamento por Vendas</div>
+                        <div class='metric-value'>R$ {formatar_moeda(pag_vendas_comercial)}</div>
+                        <div class='status-badge {status_vendas_class}'>{status_vendas}</div>
+                    </div>
+                    <div class='metric-item'>
+                        <div class='metric-title'>Pagamento por Margem</div>
+                        <div class='metric-value'>R$ {formatar_moeda(pag_margem_comercial)}</div>
+                        <div class='status-badge {status_margem_class}'>{status_margem}</div>
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Gráfico de comparação
+            st.markdown("<div class='divider'></div>", unsafe_allow_html=True)
+            st.markdown("### 📊 Comparação entre Setores")
+            
+            dados_pagamentos = pd.DataFrame({
+                'Setor': ['ADM/Operacional', 'Comercial/Gerência'],
+                'Pagamento Total': [total_adm, total_comercial],
+                'Pagamento Vendas': [pag_vendas_adm, pag_vendas_comercial],
+                'Pagamento Margem': [pag_margem_adm, pag_margem_comercial]
+            })
+            
+            fig_pagamentos = px.bar(
+                dados_pagamentos,
+                x='Setor',
+                y=['Pagamento Vendas', 'Pagamento Margem'],
+                title="Distribuição de Pagamentos por Setor",
+                labels={'value': 'Valor (R$)', 'variable': 'Tipo'},
+                barmode='group',
+                color_discrete_sequence=['#1976d2', '#e65100']
+            )
+            fig_pagamentos.update_layout(
+                legend_title_text='',
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font=dict(size=12)
+            )
+            st.plotly_chart(fig_pagamentos, use_container_width=True)
+            
+
+        else:
+            st.warning("Nenhum dado encontrado para processar.")
+    except Exception as e:
+        st.error(f"Erro ao processar os dados: {str(e)}")
+
+# Chamar a função principal
+processar_dados()
