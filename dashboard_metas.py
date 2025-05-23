@@ -4,6 +4,7 @@ import plotly.express as px
 from datetime import datetime
 import os
 import locale
+import streamlit.components.v1 as components
 
 # Configuração da página DEVE SER A PRIMEIRA COISA NO SCRIPT
 st.set_page_config(
@@ -53,14 +54,69 @@ def formatar_mes_ano(data):
     except:
         return f"{MESES_PT.get(data.month, 'Mês Desconhecido')} {data.year}"
 
-# Configuração da página (já definida no início do script)
+# Adicionar script de seleção automática para campos de número
+st.markdown("""
+<script>
+    // Função para selecionar o conteúdo do campo
+    function autoSelectInput(event) {
+        if (event.target.type === 'number') {
+            event.target.select();
+        }
+    }
 
-# Dicionário de meses em português (solução alternativa)
-MESES_PT = {
-    1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril",
-    5: "Maio", 6: "Junho", 7: "Julho", 8: "Agosto",
-    9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro"
-}
+    // Adicionar evento de clique para todos os campos de número
+    document.addEventListener('DOMContentLoaded', function() {
+        // Adicionar evento de clique para campos existentes
+        const numberInputs = document.querySelectorAll('input[type="number"]');
+        numberInputs.forEach(input => {
+            input.addEventListener('click', autoSelectInput);
+        });
+
+        // Adicionar evento de mutação para novos campos
+        const observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                if (mutation.addedNodes) {
+                    mutation.addedNodes.forEach(function(node) {
+                        if (node.nodeType === 1 && node.querySelector('input[type="number"]')) {
+                            const newInputs = node.querySelectorAll('input[type="number"]');
+                            newInputs.forEach(input => {
+                                input.addEventListener('click', autoSelectInput);
+                            });
+                        }
+                    });
+                }
+            });
+        });
+
+        // Observar mudanças no DOM
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+    });
+</script>
+""", unsafe_allow_html=True)
+
+# Configuração robusta do locale para português
+try:
+    # Tenta configurar o locale
+    locale.setlocale(locale.LC_TIME, 'pt_BR.UTF-8')
+except locale.Error:
+    try:
+        locale.setlocale(locale.LC_TIME, 'pt_BR.utf8')
+    except locale.Error:
+        try:
+            locale.setlocale(locale.LC_TIME, 'Portuguese_Brazil')
+        except locale.Error:
+            try:
+                locale.setlocale(locale.LC_TIME, 'Portuguese')
+            except locale.Error:
+                try:
+                    locale.setlocale(locale.LC_TIME, '')  # Usa o locale padrão do sistema
+                except locale.Error:
+                    locale.setlocale(locale.LC_TIME, 'C')  # Fallback para locale padrão do sistema
+                    st.warning("Locale pt_BR não encontrado, usando sistema alternativo")
+                    st.info("Os meses serão exibidos em português usando o dicionário MESES_PT")
 
 # Estilos CSS personalizados - Versão Aprimorada
 st.markdown("""
@@ -401,9 +457,8 @@ def formatar_mes_ano(data):
 
 # Função para formatar valores monetários
 def formatar_moeda(valor):
-    if isinstance(valor, (int, float)):
-        return "{:,.2f}".format(valor).replace(",", "").replace(".", ",")
-    return valor
+    # Formata o valor com separador de milhar (.) e decimal (,)
+    return f"R$ {valor:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
 
 # Função auxiliar para formatar DataFrame com meses em português
 def formatar_dataframe(df):
@@ -554,17 +609,30 @@ with st.expander("📤 Inserir Resultados", expanded=True):
         with col2:
             realizado_atual = resultados_df[resultados_df['Mes'] == data_resultado]['Realizado_Comercial']
             valor_inicial = float(realizado_atual.values[0]) if not realizado_atual.empty else 0.0
-            realizado_com = st.number_input("Vendas Realizadas (R$)", min_value=0.0, value=valor_inicial, step=10000.0)
+            
+            # Campos de input com seleção automática usando o componente personalizado
+            vendas_realizadas = st.number_input(
+                "Vendas Realizadas (R$)",
+                min_value=0.0,
+                value=valor_inicial,
+                step=10000.0
+            )
     
         margem_atual = resultados_df[resultados_df['Mes'] == data_resultado]['Realizado_Margem']
         margem_inicial = float(margem_atual.values[0]) if not margem_atual.empty else 0.0
-        realizado_margem = st.number_input("Margem Realizada (%)", min_value=0.0, max_value=100.0, value=margem_inicial, step=0.01)
+        margem_realizada = st.number_input(
+            "Margem Realizada (%)",
+            min_value=0.0,
+            max_value=100.0,
+            value=margem_inicial,
+            step=0.01
+        )
         
         if st.button("💾 Salvar Resultados", use_container_width=True, key="save_resultados"):
             novo_resultado = {
                 'Mes': data_resultado,
-                'Realizado_Comercial': realizado_com,
-                'Realizado_Margem': realizado_margem
+                'Realizado_Comercial': vendas_realizadas,
+                'Realizado_Margem': margem_realizada
             }
             
             resultados_df = resultados_df[resultados_df['Mes'] != data_resultado]
@@ -781,6 +849,6 @@ processar_dados()
 # Adicionar versão no rodapé
 st.markdown("""
 <div style='text-align: center; margin-top: 20px; color: #666; font-size: 12px;'>
-Versão 1.2.2.3
+Versão 1.2.2.4
 </div>
 """, unsafe_allow_html=True)
