@@ -1,0 +1,33 @@
+credentials:
+  usernames:
+    cristiano:
+      email: cristiano@mercado.com
+      name: Cristiano
+      password: $2b$12$9RZJ3X6QpL3w57Y89Z0qOu89Z0qOu89Z0qOu89Z0qOu89Z0qOu
+    dandara:
+      email: dandara@mercado.com
+      name: Dandara
+      password: $2b$12$9RZJ3X6QpL3w57Y89Z0qOu89Z0qOu89Z0qOu89Z0qOu89Z0qOu
+    adriana:
+      email: adriana@mercado.com
+      name: Adriana
+      password: $2b$12$9RZJ3X6QpL3w57Y89Z0qOu89Z0qOu89Z0qOu89Z0qOu89Z0qOu
+    carla:
+      email: carla@mercado.com
+      name: Carla
+      password: $2b$12$9RZJ3X6QpL3w57Y89Z0qOu89Z0qOu89Z0qOu89Z0qOu89Z0qOu
+cookie:
+  expiry_days: 30
+  key: random_signature_key
+  preauthorized:
+    emails:
+    - cristiano@mercado.com
+    - dandara@mercado.com
+    - adriana@mercado.com
+    - carla@mercado.com
+preauthorized:
+  emails:
+  - cristiano@mercado.com
+  - dandara@mercado.com
+  - adriana@mercado.com
+  - carla@mercado.com
